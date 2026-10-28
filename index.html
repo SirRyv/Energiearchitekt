@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energie-Architekt: Schülerlabor Simulator</title>
+    <!-- Tailwind CSS für erstklassiges Design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js für flüssige Echtzeit-Diagramme -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Font 'Inter' für moderne Typografie -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome für spielerische Symbole -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar für sauberen Look */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Pulse Animation für Energie-Fluss */
+        @keyframes pulse-flow {
+            0% { stroke-dashoffset: 24; }
+            100% { stroke-dashoffset: 0; }
+        }
+        .flow-line {
+            stroke-dasharray: 8;
+            animation: pulse-flow 1s linear infinite;
+        }
+        .flow-inactive {
+            stroke-dasharray: none;
+            animation: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col p-4 md:p-6">
+
+    <div class="max-w-7xl mx-auto w-full flex-grow flex flex-col gap-6">
+        
+        <!-- Header Bereich -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-800/80 backdrop-blur border border-slate-700/50 p-5 rounded-2xl shadow-xl gap-4">
+            <div>
+                <span class="text-xs font-bold uppercase tracking-widest text-emerald-400"><i class="fa-solid fa-graduation-cap mr-2"></i>Schülerlabor Lehr-Lern-Modul</span>
+                <h1 class="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Projekt: Der Energie-Architekt</h1>
+                <p class="text-slate-400 text-xs md:text-sm mt-1">Konstruiere die perfekte Stromversorgung für dein autarkes Modellhaus.</p>
+            </div>
+            
+            <!-- Szenarien/Wetter Auswahl -->
+            <div class="flex flex-col gap-1 w-full md:w-auto">
+                <label class="text-xs text-slate-400 font-semibold">Aktuelle Wetter-Mission:</label>
+                <div class="relative">
+                    <select id="scenario-select" onchange="changeScenario()" class="w-full md:w-64 bg-slate-700 border border-slate-600 rounded-lg py-2 px-3 text-sm font-semibold text-white focus:outline-none focus:border-emerald-500 transition cursor-pointer">
+                        <option value="sommer">☀️ Mission 1: Sonniger Sommertag</option>
+                        <option value="herbst">💨 Mission 2: Turbulenter Herbststurm</option>
+                        <option value="winter">☁️ Mission 3: Kalte Dunkelflaute</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <!-- Haupt-Spielfeld -->
+        <main class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-grow">
+            
+            <!-- Linke Spalte: Steuerungen & Haptisches Feedback (5 von 12 Spalten) -->
+            <section class="lg:col-span-5 flex flex-col gap-6">
+                
+                <!-- Gamification-Dashboard (Ziele & Kosten) -->
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+                    <h2 class="text-lg font-bold text-slate-200 border-b border-slate-700 pb-2 flex items-center justify-between">
+                        <span><i class="fa-solid fa-gamepad text-emerald-400 mr-2"></i>Mission-Status</span>
+                        <span id="mission-status" class="text-xs px-2 py-0.5 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-full font-normal">Noch nicht autark</span>
+                    </h2>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50 text-center">
+                            <span class="text-xs text-slate-400 block mb-1">Autarkiegrad</span>
+                            <div class="text-3xl font-black text-emerald-400 tracking-tight" id="score-autarky">0%</div>
+                            <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                                <div id="progress-autarky" class="bg-emerald-400 h-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50 text-center">
+                            <span class="text-xs text-slate-400 block mb-1">Systemkosten</span>
+                            <div class="text-2xl font-black text-rose-400 tracking-tight" id="score-cost">0 €</div>
+                            <span class="text-[10px] text-slate-500" id="cost-budget">Budget: 15.000 €</span>
+                        </div>
+                    </div>
+
+                    <!-- Zusätzliche Umweltkennzahlen -->
+                    <div class="grid grid-cols-2 gap-3 text-xs bg-slate-900/30 p-3 rounded-xl border border-slate-700/30">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-leaf text-emerald-500 text-sm"></i>
+                            <div>
+                                <span class="text-slate-400 block">CO₂-Ersparnis:</span>
+                                <strong id="co2-saving" class="text-slate-200">0 kg/Jahr</strong>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-bolt-lightning text-amber-500 text-sm"></i>
+                            <div>
+                                <span class="text-slate-400 block">Ungenutzter Strom:</span>
+                                <strong id="waste-energy" class="text-slate-200">0 kWh</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Die Anlagen-Regler (Dimensionierung) -->
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col gap-5">
+                    <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                        <h2 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-sliders text-cyan-400 mr-2"></i>Anlagen-Dimensionierung</h2>
+                        <button onclick="resetSliders()" class="text-xs text-slate-400 hover:text-white transition"><i class="fa-solid fa-rotate-left mr-1"></i>Zurücksetzen</button>
+                    </div>
+
+                    <!-- 1. SOLAR -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold flex items-center gap-2">
+                                <i class="fa-solid fa-sun text-amber-500 text-lg"></i> Solarzellen (Photovoltaik)
+                            </span>
+                            <span class="text-xs text-amber-400 font-bold bg-amber-950/50 border border-amber-500/20 px-2 py-0.5 rounded" id="label-solar">0 Panels</span>
+                        </div>
+                        <input type="range" id="input-solar" min="0" max="25" value="0" oninput="updateSimulation()" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                        <div class="flex justify-between text-[10px] text-slate-500">
+                            <span>0 Panels (0 €)</span>
+                            <span>Max. 25 (7.500 €)</span>
+                        </div>
+                    </div>
+
+                    <!-- 2. WIND -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold flex items-center gap-2">
+                                <i class="fa-solid fa-wind text-sky-400 text-lg"></i> Klein-Windkraftanlagen
+                            </span>
+                            <span class="text-xs text-sky-400 font-bold bg-sky-950/50 border border-sky-500/20 px-2 py-0.5 rounded" id="label-wind">0 Turbinen</span>
+                        </div>
+                        <input type="range" id="input-wind" min="0" max="4" value="0" oninput="updateSimulation()" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-400">
+                        <div class="flex justify-between text-[10px] text-slate-500">
+                            <span>0 Turbinen (0 €)</span>
+                            <span>Max. 4 (8.000 €)</span>
+                        </div>
+                    </div>
+
+                    <!-- 3. WASSERKRAFT -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold flex items-center gap-2">
+                                <i class="fa-solid fa-water text-cyan-400 text-lg"></i> Wasserrad (Grundlast)
+                            </span>
+                            <span class="text-xs text-cyan-400 font-bold bg-cyan-950/50 border border-cyan-500/20 px-2 py-0.5 rounded" id="label-water">Inaktiv</span>
+                        </div>
+                        <div class="flex items-center gap-4 bg-slate-900/40 p-3 rounded-xl border border-slate-700/30">
+                            <div class="flex-grow">
+                                <p class="text-xs text-slate-300">Konstante Energiegewinnung durch den anliegenden Gebirgsbach.</p>
+                                <span class="text-[10px] text-slate-500 block mt-1">Einmalige Baukosten: 3.500 € | Leistung: 0.3 kW permanent</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="input-water" onchange="updateSimulation()" class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:width-5 after:transition-all peer-checked:bg-cyan-500"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 4. SPEICHER -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold flex items-center gap-2">
+                                <i class="fa-solid fa-car-battery text-emerald-400 text-lg"></i> Akku-Batteriespeicher
+                            </span>
+                            <span class="text-xs text-emerald-400 font-bold bg-emerald-950/50 border border-emerald-500/20 px-2 py-0.5 rounded" id="label-battery">Inaktiv</span>
+                        </div>
+                        <input type="range" id="input-battery" min="0" max="15" value="0" oninput="updateSimulation()" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-400">
+                        <div class="flex justify-between text-[10px] text-slate-500">
+                            <span>0 kWh (Kein Speicher)</span>
+                            <span>Max. 15 kWh (4.500 €)</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Rechte Spalte: Live-Diagramm & Physikalischer Fluss (7 von 12 Spalten) -->
+            <section class="lg:col-span-7 flex flex-col gap-6">
+                
+                <!-- Didaktische Live-Grafik (Energiefluss) -->
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col gap-3">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-network-wired text-indigo-400"></i> Live-Energiefluss
+                    </h3>
+                    
+                    <!-- SVG Energiefluss Schema -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-center items-center">
+                        <svg class="w-full max-w-lg" viewBox="0 0 500 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Erzeuger (Links) -->
+                            <g transform="translate(20, 10)">
+                                <circle cx="40" cy="50" r="22" class="fill-slate-800 stroke-slate-700" stroke-width="2"/>
+                                <foreignObject x="25" y="35" width="30" height="30">
+                                    <div class="text-center text-slate-300"><i class="fa-solid fa-industry"></i></div>
+                                </foreignObject>
+                                <text x="40" y="87" class="fill-slate-400 text-[10px] font-bold" text-anchor="middle">Generatoren</text>
+                                <text id="flow-gen-val" x="40" y="103" class="fill-cyan-400 text-xs font-bold" text-anchor="middle">0.0 kW</text>
+                            </g>
+
+                            <!-- Fluss-Linien -->
+                            <!-- Generatoren -> Haus -->
+                            <path d="M 82 60 L 220 60" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+                            <path id="line-gen-house" d="M 82 60 L 220 60" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" class="flow-line flow-inactive"/>
+
+                            <!-- Haus <-> Batterie -->
+                            <path d="M 250 82 L 250 110" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+                            <path id="line-house-batt" d="M 250 82 L 250 110" stroke="#34d399" stroke-width="4" stroke-linecap="round" class="flow-line flow-inactive"/>
+
+                            <!-- Haus -> Netz -->
+                            <path d="M 280 60 L 418 60" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+                            <path id="line-house-grid" d="M 280 60 L 418 60" stroke="#f87171" stroke-width="4" stroke-linecap="round" class="flow-line flow-inactive"/>
+
+                            <!-- Haus (Mitte) -->
+                            <g transform="translate(210, 10)">
+                                <rect x="5" y="15" width="70" height="55" rx="8" class="fill-slate-800 stroke-slate-700" stroke-width="2"/>
+                                <foreignObject x="25" y="27" width="30" height="30">
+                                    <div class="text-center text-slate-300"><i class="fa-solid fa-house-chimney text-lg"></i></div>
+                                </foreignObject>
+                                <text x="40" y="87" class="fill-slate-400 text-[10px] font-bold" text-anchor="middle">Modellhaus</text>
+                                <text id="flow-house-val" x="40" y="103" class="fill-slate-200 text-xs font-bold" text-anchor="middle">0.5 kW</text>
+                            </g>
+
+                            <!-- Batterie (Unten) -->
+                            <g id="flow-group-batt" class="opacity-40" transform="translate(210, 100)">
+                                <text x="40" y="32" class="fill-slate-400 text-[10px] font-bold" text-anchor="middle">Akkustand</text>
+                                <text id="flow-batt-val" x="40" y="18" class="fill-emerald-400 text-xs font-bold" text-anchor="middle">0% (0 kWh)</text>
+                            </g>
+
+                            <!-- Stromnetz (Rechts) -->
+                            <g transform="translate(400, 10)">
+                                <circle cx="40" cy="50" r="22" class="fill-slate-800 stroke-slate-700" stroke-width="2"/>
+                                <foreignObject x="25" y="35" width="30" height="30">
+                                    <div class="text-center text-slate-300"><i class="fa-solid fa-tower-broadcast"></i></div>
+                                </foreignObject>
+                                <text x="40" y="87" class="fill-slate-400 text-[10px] font-bold" text-anchor="middle">Maste/Netz</text>
+                                <text id="flow-grid-val" x="40" y="103" class="fill-rose-400 text-xs font-bold" text-anchor="middle">Netzbezug</text>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Live Diagramm -->
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col gap-4 flex-grow justify-between">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-200"><i class="fa-solid fa-chart-line text-amber-400 mr-2"></i>24-Stunden Analyse</h2>
+                        <div class="flex gap-4 text-xs text-slate-400">
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-1.5 bg-rose-500 rounded-sm"></span>Verbrauch</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-1.5 bg-emerald-500 rounded-sm"></span>Erzeugung</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-1.5 bg-indigo-500 rounded-sm"></span>Speicherstand</span>
+                        </div>
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div class="relative w-full h-[250px] md:h-[280px]">
+                        <canvas id="energy-chart"></canvas>
+                    </div>
+
+                    <!-- Klima-Coaching & Ratschläge (Didaktische Hilfestellungen) -->
+                    <div class="bg-slate-900 border border-slate-700/50 rounded-xl p-4 flex gap-4 items-start shadow-inner">
+                        <div class="text-emerald-400 text-xl mt-1" id="coach-icon">
+                            <i class="fa-solid fa-user-astronaut"></i>
+                        </div>
+                        <div class="text-xs space-y-1">
+                            <h4 class="font-bold text-slate-200" id="coach-title">Klima-Trainer:</h4>
+                            <p class="text-slate-400 leading-relaxed" id="coach-text">Wähle oben eine Wetter-Mission aus und bewege die Regler, um die grüne Linie über die rote Linie zu heben!</p>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // --- 1. Physikalische & Wirtschaftliche Konstanten ---
+        const COST_SOLAR_PANEL = 300;     // € pro Solar-Panel
+        const COST_WIND_TURBINE = 2000;   // € pro Windrad
+        const COST_WATER_WHEEL = 3500;    // € für Wasserrad
+        const COST_BATTERY_KWH = 300;     // € pro kWh Speicherkapazität
+
+        const SOL_PANEL_PEAK = 0.4;       // kW Spitzenleistung pro Panel
+        const WIND_TURBINE_PEAK = 1.2;    // kW Spitzenleistung pro Turbine
+        const WATER_WHEEL_POWER = 0.3;    // kW Dauerlast Wasserrad
+
+        // 24-Stunden Verbrauchsprofil des Beispiel-Haushalts (Summe: ~12.2 kWh)
+        const HOURLY_CONSUMPTION = [
+            0.3, 0.3, 0.3, 0.3, 0.4, 0.8, // Nacht/Frühmorgens
+            1.2, 1.5, 0.8, 0.6, 0.5, 0.5, // Vormittags/Mittagsspitze
+            0.6, 0.5, 0.5, 0.6, 0.8, 1.4, // Nachmittags
+            1.8, 1.6, 1.2, 0.8, 0.5, 0.4  // Abendspitze/Nachtruhe
+        ];
+
+        // Wetterprofile der 3 Missionen (Normierte Produktionsfaktoren 0.0 - 1.0)
+        const SCENARIOS = {
+            sommer: {
+                solar: [0, 0, 0, 0, 0, 0.05, 0.2, 0.5, 0.75, 0.9, 1.0, 1.0, 0.95, 0.85, 0.65, 0.4, 0.15, 0.02, 0, 0, 0, 0, 0, 0],
+                wind:  [0.1, 0.1, 0.05, 0.05, 0.1, 0.15, 0.2, 0.2, 0.15, 0.1, 0.1, 0.15, 0.2, 0.2, 0.1, 0.05, 0.05, 0.1, 0.1, 0.15, 0.2, 0.2, 0.1, 0.1]
+            },
+            herbst: {
+                solar: [0, 0, 0, 0, 0, 0, 0.02, 0.1, 0.2, 0.3, 0.35, 0.35, 0.3, 0.25, 0.15, 0.05, 0.01, 0, 0, 0, 0, 0, 0, 0],
+                wind:  [0.6, 0.7, 0.8, 0.9, 0.95, 0.85, 0.7, 0.6, 0.65, 0.75, 0.8, 0.7, 0.6, 0.65, 0.8, 0.9, 0.95, 0.85, 0.75, 0.65, 0.6, 0.55, 0.6, 0.65]
+            },
+            winter: {
+                solar: [0, 0, 0, 0, 0, 0, 0, 0.02, 0.05, 0.1, 0.15, 0.15, 0.12, 0.08, 0.03, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                wind:  [0.15, 0.1, 0.1, 0.05, 0.05, 0.1, 0.1, 0.15, 0.1, 0.05, 0.05, 0.1, 0.1, 0.12, 0.15, 0.1, 0.08, 0.05, 0.1, 0.15, 0.15, 0.1, 0.08, 0.1]
+            }
+        };
+
+        // --- 2. Chart.js Initialisierung ---
+        let chartInstance = null;
+        function initChart() {
+            const ctx = document.getElementById('energy-chart').getContext('2d');
+            
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${String(i).padStart(2, '0')}:00`),
+                    datasets: [
+                        {
+                            label: 'Verbrauch (kW)',
+                            data: [...HOURLY_CONSUMPTION],
+                            borderColor: '#ef4444',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Erzeugung Erneuerbar (kW)',
+                            data: Array(24).fill(0),
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Speicherladung (kWh)',
+                            data: Array(24).fill(0),
+                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.05)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y_battery'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            min: 0,
+                            max: 6,
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' },
+                            title: { display: true, text: 'Leistung (kW)', color: '#94a3b8', font: { size: 10 } }
+                        },
+                        y_battery: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            min: 0,
+                            max: 15,
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#94a3b8' },
+                            title: { display: true, text: 'Speicherinhalt (kWh)', color: '#94a3b8', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // --- 3. Simulationsberechnung & UI Aktualisierung ---
+        function updateSimulation() {
+            // Werte aus den Sliders & Inputs holen
+            const solarCount = parseInt(document.getElementById('input-solar').value);
+            const windCount = parseInt(document.getElementById('input-wind').value);
+            const waterActive = document.getElementById('input-water').checked;
+            const batteryCap = parseInt(document.getElementById('input-battery').value);
+            const activeScenarioKey = document.getElementById('scenario-select').value;
+
+            // Labels updaten
+            document.getElementById('label-solar').innerText = `${solarCount} Panel${solarCount !== 1 ? 's' : ''}`;
+            document.getElementById('label-wind').innerText = `${windCount} Turbine${windCount !== 1 ? 's' : ''}`;
+            document.getElementById('label-water').innerText = waterActive ? 'Aktiv (0.3 kW)' : 'Inaktiv';
+            document.getElementById('label-battery').innerText = batteryCap > 0 ? `${batteryCap} kWh` : 'Inaktiv';
+
+            // Kostenberechnung
+            let totalCosts = (solarCount * COST_SOLAR_PANEL) +
+                             (windCount * COST_WIND_TURBINE) +
+                             (waterActive ? COST_WATER_WHEEL : 0) +
+                             (batteryCap * COST_BATTERY_KWH);
+
+            // Budget-Anzeige & Kosten aktualisieren
+            document.getElementById('score-cost').innerText = `${totalCosts.toLocaleString('de-DE')} €`;
+            if (totalCosts > 15000) {
+                document.getElementById('score-cost').className = "text-2xl font-black text-rose-500 tracking-tight";
+                document.getElementById('cost-budget').innerHTML = "⚠️ Budget überschritten (Max 15.000 €!)";
+                document.getElementById('cost-budget').className = "text-[10px] text-rose-400 font-bold";
+            } else {
+                document.getElementById('score-cost').className = "text-2xl font-black text-emerald-400 tracking-tight";
+                document.getElementById('cost-budget').innerText = "Budget eingehalten (Max 15.000 €)";
+                document.getElementById('cost-budget').className = "text-[10px] text-slate-500";
+            }
+
+            // Physikalische Erzeugung & Batterie-Speicher-Simulation über 24 Stunden
+            let generationProfile = [];
+            let batteryStateProfile = [];
+            let batteryCharge = 0; // Zu Beginn leer
+            
+            let totalConsumption = 0;
+            let totalCoveredConsumption = 0;
+            let totalWastedEnergy = 0;
+
+            const selectedScenario = SCENARIOS[activeScenarioKey];
+
+            for (let h = 0; h < 24; h++) {
+                let solarPower = selectedScenario.solar[h] * solarCount * SOL_PANEL_PEAK;
+                let windPower = selectedScenario.wind[h] * windCount * WIND_TURBINE_PEAK;
+                let waterPower = waterActive ? WATER_WHEEL_POWER : 0;
+                
+                let hourGen = solarPower + windPower + waterPower;
+                generationProfile.push(hourGen);
+
+                let hourCons = HOURLY_CONSUMPTION[h];
+                totalConsumption += hourCons;
+
+                if (hourGen >= hourCons) {
+                    // Überschuss
+                    totalCoveredConsumption += hourCons;
+                    let surplus = hourGen - hourCons;
+
+                    if (batteryCap > 0) {
+                        let potentialCharge = Math.min(surplus, batteryCap - batteryCharge);
+                        batteryCharge += potentialCharge;
+                        totalWastedEnergy += (surplus - potentialCharge);
+                    } else {
+                        totalWastedEnergy += surplus;
+                    }
+                } else {
+                    // Defizit
+                    let deficit = hourCons - hourGen;
+                    totalCoveredConsumption += hourGen;
+
+                    if (batteryCap > 0 && batteryCharge > 0) {
+                        let discharge = Math.min(deficit, batteryCharge);
+                        batteryCharge -= discharge;
+                        totalCoveredConsumption += discharge;
+                    }
+                }
+
+                batteryStateProfile.push(batteryCharge);
+            }
+
+            // Kennzahlen berechnen
+            let autarkyQuote = totalConsumption > 0 ? Math.round((totalCoveredConsumption / totalConsumption) * 100) : 0;
+            let co2Saved = (totalCoveredConsumption * 0.45 * 365).toFixed(0); // 0.45 kg CO2 Ersparnis pro autarker kWh im deutschen Strommix
+
+            // Dashboard & Gamification updaten
+            document.getElementById('score-autarky').innerText = `${autarkyQuote}%`;
+            document.getElementById('progress-autarky').style.width = `${autarkyQuote}%`;
+            document.getElementById('co2-saving').innerText = `${co2Saved} kg / Jahr`;
+            document.getElementById('waste-energy').innerText = `${totalWastedEnergy.toFixed(1)} kWh`;
+
+            // Visualisierung im Live-Energiefluss Diagramm (für Echtzeit-Stunde 12:00 Mittag als Demonstration)
+            let demoHour = 12;
+            let demoGen = generationProfile[demoHour];
+            let demoCons = HOURLY_CONSUMPTION[demoHour];
+            let demoNet = demoGen - demoCons;
+
+            document.getElementById('flow-gen-val').innerText = `${demoGen.toFixed(1)} kW`;
+            document.getElementById('flow-house-val').innerText = `${demoCons.toFixed(1)} kW`;
+
+            // Flusslinien ansteuern
+            if (demoGen > 0.05) {
+                document.getElementById('line-gen-house').classList.remove('flow-inactive');
+            } else {
+                document.getElementById('line-gen-house').classList.add('flow-inactive');
+            }
+
+            if (batteryCap > 0) {
+                document.getElementById('flow-group-batt').classList.remove('opacity-40');
+                let currentBatPct = Math.round((batteryStateProfile[demoHour] / batteryCap) * 100);
+                document.getElementById('flow-batt-val').innerText = `${currentBatPct}% (${batteryStateProfile[demoHour].toFixed(1)} kWh)`;
+                
+                if (Math.abs(demoNet) > 0.05) {
+                    document.getElementById('line-house-batt').classList.remove('flow-inactive');
+                    // Farbe je nach Lade/Entlade-Richtung
+                    document.getElementById('line-house-batt').setAttribute('stroke', demoNet > 0 ? '#34d399' : '#a7f3d0');
+                } else {
+                    document.getElementById('line-house-batt').classList.add('flow-inactive');
+                }
+            } else {
+                document.getElementById('flow-group-batt').classList.add('opacity-40');
+                document.getElementById('flow-batt-val').innerText = "Nicht verbaut";
+                document.getElementById('line-house-batt').classList.add('flow-inactive');
+            }
+
+            if (demoNet < 0) {
+                // Stromnetz muss einspringen (Netzbezug)
+                document.getElementById('flow-grid-val').innerText = `Netzbezug: ${Math.abs(demoNet).toFixed(1)} kW`;
+                document.getElementById('flow-grid-val').className = "fill-rose-400 text-xs font-bold";
+                document.getElementById('line-house-grid').classList.remove('flow-inactive');
+                document.getElementById('line-house-grid').setAttribute('stroke', '#f87171');
+            } else {
+                // Überschuss ins Netz einspeisen
+                document.getElementById('flow-grid-val').innerText = `Einspeisung: ${demoNet.toFixed(1)} kW`;
+                document.getElementById('flow-grid-val').className = "fill-emerald-400 text-xs font-bold";
+                if (demoNet > 0.1) {
+                    document.getElementById('line-house-grid').classList.remove('flow-inactive');
+                    document.getElementById('line-house-grid').setAttribute('stroke', '#34d399');
+                } else {
+                    document.getElementById('line-house-grid').classList.add('flow-inactive');
+                }
+            }
+
+            // Mission-Status verwalten
+            const missionStatusEl = document.getElementById('mission-status');
+            if (autarkyQuote === 100 && totalCosts <= 15000) {
+                missionStatusEl.innerText = "🏆 Mission Erreicht!";
+                missionStatusEl.className = "text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-bold";
+            } else if (totalCosts > 15000) {
+                missionStatusEl.innerText = "🚨 Budget Überschritten!";
+                missionStatusEl.className = "text-xs px-2 py-0.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full font-bold";
+            } else {
+                missionStatusEl.innerText = "Noch nicht autark";
+                missionStatusEl.className = "text-xs px-2 py-0.5 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-full font-normal";
+            }
+
+            // Didaktisches Ratschlag-System (Klima-Coach)
+            generateCoachAdvice(autarkyQuote, totalCosts, solarCount, windCount, waterActive, batteryCap, activeScenarioKey);
+
+            // Chart-Werte aktualisieren
+            chartInstance.data.datasets[1].data = generationProfile;
+            chartInstance.data.datasets[2].data = batteryStateProfile;
+            chartInstance.options.scales.y_battery.max = Math.max(10, batteryCap);
+            chartInstance.update();
+        }
+
+        // --- 4. Didaktische Feedback-Generierung ---
+        function generateCoachAdvice(autarky, cost, solar, wind, water, battery, scenario) {
+            const coachTextEl = document.getElementById('coach-text');
+            const coachTitleEl = document.getElementById('coach-title');
+            const coachIconEl = document.getElementById('coach-icon');
+
+            if (cost > 15000) {
+                coachTitleEl.innerText = "Finanz-Coach:";
+                coachIconEl.innerHTML = '<i class="fa-solid fa-hand-holding-dollar text-rose-400"></i>';
+                coachTextEl.innerText = "Halt! Deine Anlage ist zu teuer. Das Schüler-Budget liegt bei maximal 15.000 €. Versuche günstigere Kombinationen zu finden, um Autarkie zu erreichen.";
+                return;
+            }
+
+            if (autarky === 100) {
+                coachTitleEl.innerText = "Klima-Trainer:";
+                coachIconEl.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-400"></i>';
+                coachTextEl.innerText = `Hervorragend! Du hast 100% Autarkie erreicht. Das Haus ist komplett unabhängig. Schaffst du das gleiche Ergebnis auch noch etwas günstiger als ${cost.toLocaleString('de-DE')} €? Probiere es!`;
+                return;
+            }
+
+            coachIconEl.innerHTML = '<i class="fa-solid fa-user-astronaut text-cyan-400"></i>';
+            coachTitleEl.innerText = "Klima-Trainer:";
+
+            if (scenario === 'sommer') {
+                if (solar < 8) {
+                    coachTextEl.innerText = "Im Sommer haben wir unglaublich viel Sonne. Nutze das aus und platziere mindestens 8-10 Solarpanels auf dem Dach, um am Tag genügend Energie zu erzeugen.";
+                } else if (battery === 0) {
+                    coachTextEl.innerText = "Gute Erzeugung am Tag! Aber schau auf das Diagramm: Sobald die Sonne untergeht (nach 19:00 Uhr), bricht deine Erzeugung weg. Du benötigst jetzt einen Batteriespeicher für die Nacht.";
+                } else {
+                    coachTextEl.innerText = "Du bist nah dran! Erhöhe die Akkukapazität oder füge ein kleines Windrad hinzu, um auch nachts die restlichen Prozentpunkte Autarkie zu decken.";
+                }
+            } else if (scenario === 'herbst') {
+                if (wind < 2) {
+                    coachTextEl.innerText = "Im Herbststurm ist es bewölkt, aber es weht mächtiger Wind! Solarpanels bringen hier kaum etwas. Setze primär auf Windturbinen!";
+                } else if (battery === 0) {
+                    coachTextEl.innerText = "Deine Windturbinen produzieren viel Strom, aber unregelmäßig. Ein Akku hilft dir, Windflauten am Tag auszugleichen.";
+                } else {
+                    coachTextEl.innerText = "Prüfe, ob du die teuren Windkraftanlagen durch die permanente Grundlast eines Wasserrads unterstützen kannst, um Kosten zu sparen.";
+                }
+            } else if (scenario === 'winter') {
+                if (!water) {
+                    coachTextEl.innerText = "Die gefürchtete Dunkelflaute: Fast kein Wind und kaum Sonne. Das ist die schwerste Mission! Schalte unbedingt das Wasserrad am Bach an – es liefert dir eine konstante, wetterunabhängige Grundlast!";
+                } else if (battery < 8) {
+                    coachTextEl.innerText = "Sehr gut, das Wasserrad arbeitet fleißig. Jetzt benötigst du einen ordentlich großen Akku, um den unregelmäßigen Wind- und Solarstrom für die Verbrauchsspitzen am Abend zwischenzuspeichern.";
+                } else {
+                    coachTextEl.innerText = "Kombiniere alle drei Erzeugungsformen clever miteinander, um die 100% ohne Budgetüberschreitung zu knacken.";
+                }
+            }
+        }
+
+        // --- 5. Hilfsfunktionen (Steuerung & Interaktionen) ---
+        function changeScenario() {
+            // Beim Szenario-Wechsel setzen wir das Diagramm und die Regler zurück, damit die SuS neue Aufgaben lösen können
+            updateSimulation();
+        }
+
+        function resetSliders() {
+            document.getElementById('input-solar').value = 0;
+            document.getElementById('input-wind').value = 0;
+            document.getElementById('input-water').checked = false;
+            document.getElementById('input-battery').value = 0;
+            updateSimulation();
+        }
+
+        // Automatische Skalierung und Start
+        window.onload = function() {
+            initChart();
+            updateSimulation();
+        };
+    </script>
+</body>
+</html>
